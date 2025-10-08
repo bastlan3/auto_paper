@@ -13,6 +13,7 @@ import io
 import os
 import uuid
 import wave
+import time
 
 logging.basicConfig(level=logging.INFO)
 
@@ -157,19 +158,33 @@ def get_implementation_plan(paper_id: str):
 
 @app.post("/api/papers/{paper_id}/build-code")
 def build_code(paper_id: str, request: BuildCodeRequest):
-    """Creates a GitHub repo and triggers the JULES build process."""
+    """Creates a GitHub repo, waits, and then triggers the JULES build process."""
     paper = get_paper_details(paper_id)
     repo_url = github_client.create_github_repo(request.repo_name, f"Code for {paper['title']}")
     if not repo_url:
         raise HTTPException(status_code=500, detail="Failed to create GitHub repository.")
 
-    session_data = jules_client.start_jules_build(
-        repo_url,
-        request.implementation_plan,
+    # Add a delay to allow for GitHub API replication before JULES accesses it
+    logging.info("Waiting 5 seconds for GitHub repository to be available...")
+    time.sleep(5)
+
+    session_data, error_code = jules_client.start_jules_build(
+        repo_url=repo_url,
+        implementation_plan=request.implementation_plan,
         title=f"AI-Gen for: {paper['title']}"
     )
+
     if not session_data:
-        raise HTTPException(status_code=500, detail="Failed to start JULES build session.")
+        if error_code == 404:
+            error_detail = (
+                "JULES API could not find the source repository. "
+                "This usually means the JULES GitHub App does not have permission to access it. "
+                "Please ensure the app is installed on your GitHub account with access to 'All repositories' "
+                "to allow it to see newly created ones."
+            )
+            raise HTTPException(status_code=404, detail=error_detail)
+
+        raise HTTPException(status_code=500, detail=f"Failed to start JULES build session. Error code: {error_code}")
 
     return {"repo_url": repo_url, "jules_session": session_data}
 

@@ -107,6 +107,7 @@ This project requires several API keys to function fully. To handle these secure
 -   **JULES API**:
     1.  Obtain your API key from the JULES developer console.
     2.  Paste it into your `.env` file as `JULES_API_KEY`.
+    3.  **Install the JULES GitHub App**: For the JULES API to work, you must install the JULES GitHub App on your account. During installation, ensure you grant it access to **"All repositories"**. This is critical, as it allows JULES to see the new repositories created by this application. If you grant access only to specific repositories, the integration will fail with a `404 Not Found` error.
 
 ## How to Test
 
