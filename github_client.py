@@ -29,7 +29,9 @@ def create_github_repo(repo_name, description):
         return repo_data['html_url']
     except requests.exceptions.RequestException as e:
         print(f"An error occurred with the GitHub API: {e}")
-        if e.response:
+        if e.response is not None:
+            if e.response.status_code == 403:
+                print("GitHub API Error: 403 Forbidden. This likely means your GITHUB_TOKEN lacks the necessary 'repo' scope. Please create a new token with the 'repo' scope enabled.")
             print(f"Response body: {e.response.text}")
         return None
 

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import arxiv_client
@@ -8,6 +9,7 @@ import jules_client
 import logging
 import re
 from typing import List, Optional
+import io
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,6 +43,10 @@ class BuildCodeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = "Kore"
 
 class Paper(BaseModel):
     id: str
@@ -124,6 +130,16 @@ def chat_with_paper(paper_id: str, request: ChatRequest):
     if not answer:
         raise HTTPException(status_code=500, detail="Failed to get a response from the AI.")
     return {"answer": answer}
+
+@app.post("/api/tts")
+async def text_to_speech(request: TTSRequest):
+    """Generates audio from text using the Gemini TTS model."""
+    logging.info(f"Endpoint /api/tts called with voice: {request.voice}")
+    audio_data = gemini_client.get_gemini_tts_response(request.text, request.voice)
+    if not audio_data:
+        raise HTTPException(status_code=500, detail="Failed to generate audio.")
+
+    return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
 
 if __name__ == "__main__":
     import uvicorn
