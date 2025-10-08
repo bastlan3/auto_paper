@@ -5,7 +5,7 @@ import config
 def create_github_repo(repo_name, description):
     """Creates a new private GitHub repository."""
     # Do not attempt to run if credentials are not set
-    if config.GITHUB_TOKEN == "your_personal_access_token_here" or config.GITHUB_USERNAME == "your_github_username":
+    if config.GITHUB_TOKEN == "your_github_token_here" or config.GITHUB_USERNAME == "your_github_username":
         print("Skipping GitHub repo creation: GITHUB_TOKEN or GITHUB_USERNAME not set.")
         return None
 

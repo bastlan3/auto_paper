@@ -73,22 +73,17 @@ The project is organized into modular components for clarity and maintainability
 
 This project requires several API keys to function fully. To handle these securely and avoid committing them to version control, we use a `.env` file.
 
-1.  **Create a `.env` file** in the root directory of the project. This file is already listed in `.gitignore`, so it will not be tracked by Git.
-
-2.  **Add your API keys** and configuration to the `.env` file in the following format:
+1.  **Create a `.env` file** in the root directory of the project by copying the example: `cp .env.example .env`
+2.  **Add your API keys** and configuration to the `.env` file.
 
     ```env
-    # Google Cloud
-    # Get this from your GCP project dashboard.
-    GOOGLE_PROJECT_ID="your-gcp-project-id"
-    # Create a service account and download its JSON key file.
-    # See: https://cloud.google.com/docs/authentication/getting-started
-    GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/gcp-key.json"
+    # Google AI Studio API Key
+    # Get your key from https://aistudio.google.com/app/apikey
+    GOOGLE_API_KEY="your_google_api_key_here"
 
-    # GitHub
-    # Create a Personal Access Token with 'repo' scope.
-    # See: https://github.com/settings/tokens
-    GITHUB_TOKEN="your_personal_access_token_here"
+    # GitHub Fine-grained Personal Access Token
+    # Get your token from https://github.com/settings/tokens?type=beta
+    GITHUB_TOKEN="your_github_token_here"
     GITHUB_USERNAME="your_github_username"
 
     # JULES API (Hypothetical)
@@ -97,18 +92,17 @@ This project requires several API keys to function fully. To handle these secure
 
 #### How to Get API Keys:
 
--   **Google Cloud (Gemini & TTS)**:
-    1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
-    2.  Create a new project.
-    3.  Enable the **Vertex AI API** and the **Text-to-Speech API** for your project.
-    4.  Create a **Service Account**. Go to "IAM & Admin" -> "Service Accounts".
-    5.  Download the JSON key for your service account and save it securely. The path to this file is what you'll use for the `GOOGLE_APPLICATION_CREDENTIALS` environment variable.
+-   **Google AI Studio (Gemini)**:
+    1.  Go to **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
+    2.  Click "**Create API key**".
+    3.  Copy the generated key and paste it into your `.env` file as `GOOGLE_API_KEY`.
 
 -   **GitHub**:
-    1.  Go to your [GitHub Developer Settings](https://github.com/settings/tokens).
-    2.  Generate a new "Personal access token (classic)".
-    3.  Give it a name and select the `repo` scope. This will allow the application to create private repositories on your behalf.
-    4.  Copy the generated token and add it to your `.env` file.
+    1.  Go to your [GitHub Developer Settings](https://github.com/settings/tokens?type=beta) to create a **Fine-grained personal access token**.
+    2.  Give the token a name (e.g., "AI-Science-Brief-App").
+    3.  Under "Repository access," select "All repositories" or choose specific ones.
+    4.  Under "Permissions," go to "Repository permissions" and set **Contents** to **Read and write**. This is required for the application to create new repositories on your behalf.
+    5.  Generate the token, copy it, and add it to your `.env` file as `GITHUB_TOKEN`.
 
 ## How to Test
 

@@ -1,7 +1,6 @@
 apscheduler
 arxiv
-google-cloud-aiplatform
-google-cloud-texttospeech
+google-generativeai
 requests
 fastapi
 uvicorn[standard]
