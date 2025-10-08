@@ -1,14 +1,15 @@
 import arxiv
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
 def fetch_new_papers():
     """Fetches the 5 most recent papers from the cs.AI category."""
-    print("Executing scheduled job: Fetching new papers...")
+    print("Fetching new papers from arXiv...")
     try:
         search = arxiv.Search(
-            query="cat:cs.AI", # Category: Artificial Intelligence
+            query="cat:cs.AI",
             max_results=5,
             sort_by=arxiv.SortCriterion.SubmittedDate,
             sort_order=arxiv.SortOrder.Descending
@@ -17,16 +18,17 @@ def fetch_new_papers():
         papers = []
         for result in search.results():
             paper_data = {
-                "id": result.entry_id,
+                "id": result.entry_id.split('/')[-1],
                 "title": result.title,
-                "published": result.published,
-                "abstract": result.summary
+                "authors": [author.name for author in result.authors],
+                "publishedDate": result.published.strftime('%Y-%m-%d'),
+                "category": result.primary_category,
+                "abstract": result.summary.replace('\n', ' ').strip(),
+                "summary": "" # Placeholder for the Gemini summary
             }
             papers.append(paper_data)
-            print(f"--- Found Paper ---")
-            print(f"ID: {result.entry_id}")
-            print(f"Title: {result.title}")
-            print(f"Published: {result.published}")
+
+        print(f"Successfully fetched {len(papers)} papers.")
         return papers
 
     except Exception as e:
@@ -34,7 +36,8 @@ def fetch_new_papers():
         return []
 
 if __name__ == '__main__':
-    # To test immediately without waiting for the schedule, just call the function directly.
     print("--- Running manual test of fetch_new_papers() ---")
-    fetch_new_papers()
+    papers_data = fetch_new_papers()
+    import json
+    print(json.dumps(papers_data, indent=2))
     print("--- Manual test finished ---")

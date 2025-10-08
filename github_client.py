@@ -4,6 +4,11 @@ import config
 
 def create_github_repo(repo_name, description):
     """Creates a new private GitHub repository."""
+    # Do not attempt to run if credentials are not set
+    if config.GITHUB_TOKEN == "your_personal_access_token_here" or config.GITHUB_USERNAME == "your_github_username":
+        print("Skipping GitHub repo creation: GITHUB_TOKEN or GITHUB_USERNAME not set.")
+        return None
+
     url = "https://api.github.com/user/repos"
     headers = {
         "Authorization": f"token {config.GITHUB_TOKEN}",
@@ -12,12 +17,12 @@ def create_github_repo(repo_name, description):
     data = {
         "name": repo_name,
         "description": description,
-        "private": True, # Good practice to start with private repos
+        "private": True,
     }
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
-        response.raise_for_status() # Raises an exception for bad status codes (4xx or 5xx)
+        response.raise_for_status()
 
         repo_data = response.json()
         print(f"Successfully created repository: {repo_data['html_url']}")
@@ -29,14 +34,11 @@ def create_github_repo(repo_name, description):
         return None
 
 if __name__ == '__main__':
-    # --- Testing ---
     print("--- Running manual test of GitHub API ---")
-    # Use a sanitized paper title for the repo name
     test_repo_name = "SMA-Synaptic-Metaplasticity-Assimilation-2025"
     test_description = "AI-generated code implementation for the paper 'Synaptic Metaplasticity Assimilation'."
 
-    if config.GITHUB_TOKEN != "your_personal_access_token_here" and config.GITHUB_USERNAME != "your_github_username":
-        create_github_repo(test_repo_name, test_description)
-    else:
-        print("Skipping test, GITHUB_TOKEN or GITHUB_USERNAME not set.")
+    # The function now handles the check internally
+    create_github_repo(test_repo_name, test_description)
+
     print("--- Manual test finished ---")

@@ -61,7 +61,6 @@ if __name__ == '__main__':
     voice_analyst = "en-US-Wavenet-B"
     voice_researcher = "en-US-Wavenet-F"
 
-    # The function now handles initialization and config checks internally
     for i, item in enumerate(dialogue):
         success = False
         if item['speaker'] == 'Analyst':
@@ -71,7 +70,6 @@ if __name__ == '__main__':
 
         if not success:
             print(f"Could not generate audio for line {i}.")
-            # Break because if one fails, they all will
             break
 
     print("--- Manual test finished ---")

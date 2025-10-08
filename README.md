@@ -45,7 +45,7 @@ The project is organized into modular components for clarity and maintainability
 ├── tts_client.py       # Client for the Google Text-to-Speech API
 ├── github_client.py    # Client for the GitHub API
 ├── jules_client.py     # Conceptual client for the JULES API
-└── main.py             # Main application entrypoint and scheduler
+└── server.py           # FastAPI server and main application entrypoint
 ```
 
 ## Setup and Installation
@@ -146,24 +146,27 @@ python main.py
 -   **Without API Keys**: The test will run, fetch papers from arXiv, and then gracefully fail at the Gemini step, logging an error message. This confirms the workflow orchestration is correct.
 -   **With API Keys**: The test will execute the full process: fetch a paper, generate a summary, create a GitHub repo, and call the JULES API.
 
-## Running the Scheduler
+## Running the Full-Stack Application
 
-To run the application in its intended mode (fetching papers on a schedule), you need to modify the `main.py` script slightly.
+To run the application, you need to start both the backend server and the frontend development server in two separate terminals.
 
-Uncomment the call to `main()` at the bottom of the file:
+**Terminal 1: Start the Backend API Server**
 
-```python
-# main.py
-
-if __name__ == "__main__":
-    # ... (manual test block) ...
-
-    # To run the scheduler, comment out the manual test and uncomment the line below
-    # main()
-```
-
-Then, run the script. The scheduler will start and wait to execute the job at the configured time (default is Mon-Fri at 06:00 UTC).
+Navigate to the project's root directory and run the FastAPI server:
 
 ```bash
-python main.py
+python server.py
 ```
+
+You should see output indicating the server has started, usually at `http://localhost:8000`.
+
+**Terminal 2: Start the Frontend Development Server**
+
+Navigate to the `frontend` directory and run the Next.js development server:
+
+```bash
+cd frontend
+npm run dev
+```
+
+The frontend will now be available at `http://localhost:3000`. Open this URL in your browser to use the application. API requests from the frontend will be automatically proxied to your backend server.

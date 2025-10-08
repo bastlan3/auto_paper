@@ -3,3 +3,5 @@ arxiv
 google-cloud-aiplatform
 google-cloud-texttospeech
 requests
+fastapi
+uvicorn[standard]
