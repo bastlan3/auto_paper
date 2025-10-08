@@ -13,22 +13,21 @@ This backend is built with Python in a modular structure, allowing for easy test
     - [Install Dependencies](#install-dependencies)
     - [API Key Management](#api-key-management)
 4.  [How to Test](#how-to-test)
-    - [Testing Individual API Clients](#testing-individual-api-clients)
-    - [Running the Full Integration Test](#running-the-full-integration-test)
-5.  [Running the Scheduler](#running-the-scheduler)
+5.  [Running the Full-Stack Application](#running-the-full-stack-application)
 
 ---
 
 ## Features
 
 -   **Daily Paper Fetching**: Schedules a daily job to fetch the latest papers from the `cs.AI` category on arXiv.
--   **AI-Powered Summaries**: Uses the Google Gemini API to generate multiple forms of content:
-    -   A concise 3-sentence summary for a "newspaper view."
-    -   A two-voice dialogue script for an audio summary.
-    -   A detailed implementation plan based on the paper's abstract.
--   **Text-to-Speech**: Converts the generated dialogue script into audio files using the Google TTS API.
+-   **AI-Powered Content Generation**: Uses the Google Gemini API to generate multiple forms of content:
+    -   A concise 3-sentence summary for a quick overview.
+    -   A detailed, 10-minute conversational audio summary between a curious "Interviewer" and a knowledgeable "Author."
+    -   A technical implementation plan based on the paper's abstract.
+    -   In-depth answers to user questions, using the **full text** of the paper for context.
+-   **Multi-Speaker Text-to-Speech**: Converts the generated dialogue script into a high-quality audio file using two distinct voices.
 -   **Automated Repo Creation**: Creates a new private GitHub repository for a paper.
--   **Conceptual Code Generation**: Sends the implementation plan to a conceptual "JULES API" to start a code generation task.
+-   **JULES Integration**: Sends the implementation plan to the JULES API to start a code generation task in the newly created repository.
 -   **Robust & Testable**: Designed to run even without full API credentials, allowing for safe testing and development.
 
 ## Project Structure
@@ -37,14 +36,14 @@ The project is organized into modular components for clarity and maintainability
 
 ```
 .
+├── .env.example        # Example environment file for API keys
 ├── .gitignore          # Prevents secrets and compiled files from being committed
 ├── config.py           # Handles loading of all configuration and API keys
 ├── requirements.txt    # Lists all Python dependencies
-├── arxiv_client.py     # Client for interacting with the arXiv API
-├── gemini_client.py    # Client for the Google Gemini API
-├── tts_client.py       # Client for the Google Text-to-Speech API
+├── arxiv_client.py     # Client for interacting with the arXiv API and fetching PDFs
+├── gemini_client.py    # Client for the Google Gemini API (text and TTS)
 ├── github_client.py    # Client for the GitHub API
-├── jules_client.py     # Conceptual client for the JULES API
+├── jules_client.py     # Client for the JULES API for code generation
 └── server.py           # FastAPI server and main application entrypoint
 ```
 
@@ -53,8 +52,9 @@ The project is organized into modular components for clarity and maintainability
 ### Prerequisites
 
 -   Python 3.8+
--   A Google Cloud Platform (GCP) account
--   A GitHub account
+-   A Google Cloud Platform (GCP) account for the Gemini API.
+-   A GitHub account.
+-   Access to the JULES API.
 
 ### Install Dependencies
 
@@ -77,7 +77,7 @@ This project requires several API keys to function fully. To handle these secure
 2.  **Add your API keys** and configuration to the `.env` file.
 
     ```env
-    # Google AI Studio API Key
+    # Google AI Studio API Key (for Gemini and TTS)
     # Get your key from https://aistudio.google.com/app/apikey
     GOOGLE_API_KEY="your_google_api_key_here"
 
@@ -86,7 +86,7 @@ This project requires several API keys to function fully. To handle these secure
     GITHUB_TOKEN="your_github_token_here"
     GITHUB_USERNAME="your_github_username"
 
-    # JULES API (Hypothetical)
+    # JULES API Key
     JULES_API_KEY="your_jules_api_key_here"
     ```
 
@@ -101,44 +101,28 @@ This project requires several API keys to function fully. To handle these secure
     1.  Go to your [GitHub Developer Settings](https://github.com/settings/tokens?type=beta) to create a **Fine-grained personal access token**.
     2.  Give the token a name (e.g., "AI-Science-Brief-App").
     3.  Under "Repository access," select "All repositories" or choose specific ones.
-    4.  Under "Permissions," go to "Repository permissions" and set **Contents** to **Read and write**. This is required for the application to create new repositories on your behalf.
+    4.  Under "Permissions," go to "Repository permissions" and set **Administration** to **Read and write**. This is required for the application to create new repositories on your behalf.
     5.  Generate the token, copy it, and add it to your `.env` file as `GITHUB_TOKEN`.
+
+-   **JULES API**:
+    1.  Obtain your API key from the JULES developer console.
+    2.  Paste it into your `.env` file as `JULES_API_KEY`.
 
 ## How to Test
 
-The application is designed to be tested without "going full send." Each API client can be run individually, and the scripts are built to gracefully skip API calls if credentials are not configured.
-
-### Testing Individual API Clients
-
-You can test each module by running it as a script from your terminal.
-
--   **arXiv Client**: This client does not require an API key.
-    ```bash
-    python arxiv_client.py
-    ```
-    This will fetch the 5 most recent papers from `cs.AI` and print their details.
-
--   **Gemini, TTS, GitHub, JULES Clients**:
-    If you have **not** configured the API keys in your `.env` file, running these scripts will demonstrate the safe-skip functionality:
-    ```bash
-    python gemini_client.py
-    # Output: Skipping Gemini client initialization...
-
-    python github_client.py
-    # Output: Skipping test, GITHUB_TOKEN or GITHUB_USERNAME not set.
-    ```
-    If you **have** configured the keys, running the scripts will execute a live test against the respective API.
-
-### Running the Full Integration Test
-
-The `main.py` script can be run directly to test the entire workflow.
+The application is designed to be tested without "going full send." Each API client can be run individually from your terminal, and the scripts are built to gracefully skip API calls if credentials are not configured.
 
 ```bash
-python main.py
-```
+# Test arXiv client (no key required)
+python arxiv_client.py
 
--   **Without API Keys**: The test will run, fetch papers from arXiv, and then gracefully fail at the Gemini step, logging an error message. This confirms the workflow orchestration is correct.
--   **With API Keys**: The test will execute the full process: fetch a paper, generate a summary, create a GitHub repo, and call the JULES API.
+# Test Gemini, GitHub, or JULES clients
+# These will show a "skipping" message if keys are not set
+python gemini_client.py
+python github_client.py
+python jules_client.py
+```
+If you **have** configured the keys, running the scripts will execute a live test against the respective API.
 
 ## Running the Full-Stack Application
 

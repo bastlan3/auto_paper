@@ -16,6 +16,6 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "your_google_api_key_here")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "your_github_token_here")
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "your_github_username")
 
-# JULES API (Hypothetical)
+# JULES API
 JULES_API_KEY = os.environ.get("JULES_API_KEY", "your_jules_api_key_here")
-JULES_API_ENDPOINT = "https://api.jules.ai/v1/sessions" # Hypothetical endpoint
+JULES_API_BASE_URL = "https://jules.googleapis.com/v1alpha" # Official endpoint

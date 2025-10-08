@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import arxiv_client
@@ -10,6 +10,9 @@ import logging
 import re
 from typing import List, Optional
 import io
+import os
+import uuid
+import wave
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,7 +37,52 @@ paper_cache: List[dict] = []
 # --- System Prompts ---
 SUMMARY_PROMPT_TEMPLATE = """You are an expert scientific communicator... Output ONLY the three-sentence summary. Abstract: `{abstract}`"""
 METHOD_PROMPT_TEMPLATE = """You are a senior research engineer... Format as a Markdown-ready guide. CONTEXT: `{abstract}`"""
-QA_PROMPT_TEMPLATE = """You are a specialized AI assistant... User Question: {question}"""
+QA_PROMPT_TEMPLATE = """You are a specialized AI assistant with the full text of a research paper. Your task is to answer user questions based on the paper's content.
+CONTEXT:
+{paper_text}
+
+RULES:
+1. Base your answers entirely on the provided paper text.
+2. If the answer is not in the text, state that clearly.
+3. Be concise and directly answer the question.
+
+User Question: {question}"""
+
+DIALOGUE_PROMPT_TEMPLATE = """You are a scriptwriter for a science podcast. Your task is to create a 10-minute conversational script between an "Interviewer" and the "Author" of a research paper.
+
+The script should be engaging and informative for a general audience with a keen interest in science.
+
+**Interviewer's Role:**
+- Inquisitive and curious.
+- Asks clarifying questions.
+- Probes for the paper's strengths, weaknesses, and broader implications.
+- Keeps the conversation flowing and accessible.
+
+**Author's Role:**
+- The expert on the paper.
+- Answers questions clearly and concisely, using the provided text as the source of truth.
+- Explains complex concepts in an easy-to-understand manner.
+
+**Script Guidelines:**
+- The total length should be approximately 10 minutes of spoken dialogue.
+- The dialogue must be formatted exactly as follows, with "Interviewer:" and "Author:" on new lines.
+- The script must start with "TTS the following conversation between Interviewer and Author:"
+- Ground all of the Author's responses in the provided paper text.
+
+**Paper Text:**
+---
+{paper_text}
+---
+
+**Example Snippet:**
+TTS the following conversation between Interviewer and Author:
+Interviewer: Welcome to "Science Spotlight." Today, we're thrilled to discuss your latest paper. Can you start by giving us the elevator pitch? What is the core problem you're trying to solve?
+Author: Thank you for having me. The central problem we address is catastrophic forgetting in neural networks, which is a major hurdle in continual learning scenarios where models need to learn from a continuous stream of data.
+Interviewer: That sounds complex. How does your proposed method, Synaptic Metaplasticity Assimilation, tackle this?
+Author: Our method works by...
+
+Now, generate the full 10-minute script based on the paper text provided.
+"""
 
 # --- Pydantic Models ---
 class BuildCodeRequest(BaseModel):
@@ -115,7 +163,11 @@ def build_code(paper_id: str, request: BuildCodeRequest):
     if not repo_url:
         raise HTTPException(status_code=500, detail="Failed to create GitHub repository.")
 
-    session_data = jules_client.start_jules_build(repo_url, request.implementation_plan)
+    session_data = jules_client.start_jules_build(
+        repo_url,
+        request.implementation_plan,
+        title=f"AI-Gen for: {paper['title']}"
+    )
     if not session_data:
         raise HTTPException(status_code=500, detail="Failed to start JULES build session.")
 
@@ -123,13 +175,37 @@ def build_code(paper_id: str, request: BuildCodeRequest):
 
 @app.post("/api/papers/{paper_id}/chat")
 def chat_with_paper(paper_id: str, request: ChatRequest):
-    """Handles a chat question about a paper."""
-    paper = get_paper_details(paper_id)
-    prompt = QA_PROMPT_TEMPLATE.format(abstract=paper['abstract'], question=request.question)
+    """Handles a chat question about a paper, using the full text."""
+    logging.info(f"Endpoint /api/papers/{paper_id}/chat called.")
+
+    # Fetch the full text of the paper
+    paper_text = arxiv_client.fetch_paper_text(paper_id)
+    if not paper_text:
+        raise HTTPException(status_code=500, detail="Could not retrieve the full text of the paper.")
+
+    # Create the prompt with the full text
+    prompt = QA_PROMPT_TEMPLATE.format(paper_text=paper_text, question=request.question)
+
     answer = gemini_client.get_gemini_response(prompt)
     if not answer:
         raise HTTPException(status_code=500, detail="Failed to get a response from the AI.")
+
     return {"answer": answer}
+
+@app.post("/api/papers/{paper_id}/vocal-summary")
+async def get_vocal_summary(paper_id: str):
+    """Generates a vocal summary of a paper's abstract."""
+    logging.info(f"Endpoint /api/papers/{paper_id}/vocal-summary called.")
+    paper = get_paper_details(paper_id)
+    summary = paper.get("summary")
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found for this paper.")
+
+    audio_data = gemini_client.get_gemini_tts_response(summary)
+    if not audio_data:
+        raise HTTPException(status_code=500, detail="Failed to generate vocal summary.")
+
+    return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
 
 @app.post("/api/tts")
 async def text_to_speech(request: TTSRequest):
@@ -140,6 +216,63 @@ async def text_to_speech(request: TTSRequest):
         raise HTTPException(status_code=500, detail="Failed to generate audio.")
 
     return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
+
+# --- Helper for saving audio ---
+def save_wave_file(filename: str, pcm_data: bytes, channels: int = 1, rate: int = 24000, sample_width: int = 2):
+    """Saves PCM data to a WAV file."""
+    with wave.open(filename, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(rate)
+        wf.writeframes(pcm_data)
+
+def cleanup_file(path: str):
+    """Removes a file and logs the action."""
+    try:
+        os.remove(path)
+        logging.info(f"Successfully cleaned up temporary file: {path}")
+    except OSError as e:
+        logging.error(f"Error cleaning up file {path}: {e}")
+
+@app.post("/api/papers/{paper_id}/detailed-summary")
+async def get_detailed_summary(paper_id: str, background_tasks: BackgroundTasks):
+    """
+    Generates a detailed, 10-minute conversational audio summary of a paper.
+    """
+    logging.info(f"Endpoint /api/papers/{paper_id}/detailed-summary called.")
+
+    # 1. Fetch full paper text
+    paper_text = arxiv_client.fetch_paper_text(paper_id)
+    if not paper_text:
+        raise HTTPException(status_code=500, detail="Could not retrieve the full text of the paper.")
+
+    # 2. Generate dialogue script
+    dialogue_prompt = DIALOGUE_PROMPT_TEMPLATE.format(paper_text=paper_text)
+    dialogue_script = gemini_client.get_dialogue_summary(dialogue_prompt)
+    if not dialogue_script:
+        raise HTTPException(status_code=500, detail="Failed to generate dialogue script.")
+
+    # 3. Generate multi-speaker audio
+    audio_data = gemini_client.get_multi_speaker_tts_response(dialogue_script)
+    if not audio_data:
+        raise HTTPException(status_code=500, detail="Failed to generate multi-speaker audio.")
+
+    # 4. Save audio to a temporary file
+    temp_dir = "temp_audio"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_filename = f"{uuid.uuid4()}.wav"
+    temp_filepath = os.path.join(temp_dir, temp_filename)
+
+    save_wave_file(temp_filepath, audio_data)
+    logging.info(f"Saved detailed summary to temporary file: {temp_filepath}")
+
+    # 5. Add cleanup task and return file response
+    background_tasks.add_task(cleanup_file, temp_filepath)
+    return FileResponse(
+        path=temp_filepath,
+        media_type="audio/wav",
+        filename=f"detailed_summary_{paper_id}.wav"
+    )
 
 if __name__ == "__main__":
     import uvicorn
