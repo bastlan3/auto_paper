@@ -1,5 +1,4 @@
 import google.generativeai as genai
-from google.generativeai import types
 import os
 import config
 import wave
@@ -51,16 +50,16 @@ def get_gemini_tts_response(text: str, voice: str = "Kore"):
         response = tts_model.generate_content(
             model="gemini-2.5-flash-preview-tts",
             contents=text,
-            config=types.GenerateContentConfig(
+            generation_config=genai.GenerationConfig(
                 response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name=voice,
-                        )
+            ),
+            speech_config=genai.SpeechConfig(
+                voice_config=genai.VoiceConfig(
+                    prebuilt_voice_config=genai.PrebuiltVoiceConfig(
+                        voice_name=voice,
                     )
-                ),
-            )
+                )
+            ),
         )
         # Direct access for non-streaming audio
         return response.candidates[0].content.parts[0].inline_data.data
@@ -87,29 +86,29 @@ def get_multi_speaker_tts_response(dialogue_script: str):
         response = tts_model.generate_content(
             model="gemini-2.5-flash-preview-tts",
             contents=dialogue_script,
-            config=types.GenerateContentConfig(
+            generation_config=genai.GenerationConfig(
                 response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
-                        speaker_voice_configs=[
-                            types.SpeakerVoiceConfig(
-                                speaker='Interviewer',
-                                voice_config=types.VoiceConfig(
-                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                        voice_name='Kore',
-                                    )
+            ),
+            speech_config=genai.SpeechConfig(
+                multi_speaker_voice_config=genai.MultiSpeakerVoiceConfig(
+                    speaker_voice_configs=[
+                        genai.SpeakerVoiceConfig(
+                            speaker='Interviewer',
+                            voice_config=genai.VoiceConfig(
+                                prebuilt_voice_config=genai.PrebuiltVoiceConfig(
+                                    voice_name='Kore',
                                 )
-                            ),
-                            types.SpeakerVoiceConfig(
-                                speaker='Author',
-                                voice_config=types.VoiceConfig(
-                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                        voice_name='Puck',
-                                    )
+                            )
+                        ),
+                        genai.SpeakerVoiceConfig(
+                            speaker='Author',
+                            voice_config=genai.VoiceConfig(
+                                prebuilt_voice_config=genai.PrebuiltVoiceConfig(
+                                    voice_name='Puck',
                                 )
-                            ),
-                        ]
-                    )
+                            )
+                        ),
+                    ]
                 )
             )
         )
