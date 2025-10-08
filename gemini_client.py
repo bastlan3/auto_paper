@@ -9,7 +9,7 @@ model = None
 if config.GOOGLE_API_KEY != "your_google_api_key_here":
     try:
         genai.configure(api_key=config.GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         print("Gemini client initialized successfully.")
     except Exception as e:
         print(f"Failed to initialize Gemini client: {e}")
@@ -18,7 +18,7 @@ else:
     print("Skipping Gemini client initialization: GOOGLE_API_KEY not set.")
 
 
-def get_gemini_response(prompt_text: str) -> str | None:
+def get_gemini_response(prompt_text: str):
     """
     Gets a text response from the configured Gemini model.
     """
