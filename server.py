@@ -14,6 +14,8 @@ import os
 import uuid
 import wave
 import time
+import json
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -173,6 +175,33 @@ def build_code(paper_id: str, request: BuildCodeRequest):
         implementation_plan=request.implementation_plan,
         title=f"AI-Gen for: {paper['title']}"
     )
+    if jules_client.session_info and jules_client.session_info.get("name"):
+            session_name = jules_client.session_info["name"]
+            print(f"\n--- JULES Session Info ---")
+            print(json.dumps(jules_client.session_info, indent=2))
+            print("--------------------------")
+
+            while True:
+                print("Checking session status...")
+                session_details = jules_client.get_jules_session(session_name)
+                session_state = session_details.get("state")
+                print(f"Current session state: {session_state}")
+
+                if session_state == "COMPLETED":
+                    print("Session completed successfully!")
+                    if session_details.get("outputs"):
+                        for output in session_details["outputs"]:
+                            if output.get("pullRequest"):
+                                print("\n--- Pull Request Information ---")
+                                print(json.dumps(output["pullRequest"], indent=2))
+                                print("-----------------------------")
+                    break
+                elif session_state == "FAILED":
+                    print("Session failed.")
+                    break
+                time.sleep(60) # Wait for 60 seconds before checking again
+    else:
+        print(f"\nFailed to start JULES session. Error code: {error_code}")
 
     if not session_data:
         if error_code == 404:
