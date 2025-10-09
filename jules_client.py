@@ -3,6 +3,7 @@ import json
 import config
 from urllib.parse import urlparse
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,6 +19,49 @@ def _parse_github_url(repo_url: str):
     except Exception as e:
         logging.error(f"Failed to parse GitHub URL '{repo_url}': {e}")
     return None, None
+
+def list_jules_sources():
+    url = f"{config.JULES_API_BASE_URL}/sources"
+    headers = {"X-Goog-Api-Key": config.JULES_API_KEY}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def list_jules_sessions(page_size=5):
+    url = f"{config.JULES_API_BASE_URL}/sessions?pageSize={page_size}"
+    headers = {"X-Goog-Api-Key": config.JULES_API_KEY}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def get_jules_session(session_name: str):
+    """Gets the details of a specific Jules session."""
+    url = f"{config.JULES_API_BASE_URL}/{session_name}"
+    headers = {"X-Goog-Api-Key": config.JULES_API_KEY}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def approve_jules_plan(session_id):
+    url = f"{config.JULES_API_BASE_URL}/sessions/{session_id}:approvePlan"
+    headers = {
+        "X-Goog-Api-Key": config.JULES_API_KEY,
+        "Content-Type": "application/json"
+    }
+    response = requests.post(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+def send_jules_message(session_id, prompt):
+    url = f"{config.JULES_API_BASE_URL}/sessions/{session_id}:sendMessage"
+    headers = {
+        "X-Goog-Api-Key": config.JULES_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {"prompt": prompt}
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()
 
 def start_jules_build(repo_url: str, implementation_plan: str, title: str):
     """
@@ -79,10 +123,33 @@ if __name__ == '__main__':
         print(f"Attempting to start JULES session for repo: {test_repo_url}")
         session_info, error_code = start_jules_build(test_repo_url, test_plan, test_title)
 
-        if session_info:
-            print("\n--- JULES Session Info ---")
+        if session_info and session_info.get("name"):
+            session_name = session_info["name"]
+            print(f"\n--- JULES Session Info ---")
             print(json.dumps(session_info, indent=2))
             print("--------------------------")
+
+            while True:
+                print("Checking session status...")
+                session_details = get_jules_session(session_name)
+                session_state = session_details.get("state")
+                print(f"Current session state: {session_state}")
+
+                if session_state == "COMPLETED":
+                    print("Session completed successfully!")
+                    if session_details.get("outputs"):
+                        for output in session_details["outputs"]:
+                            if output.get("pullRequest"):
+                                print("\n--- Pull Request Information ---")
+                                print(json.dumps(output["pullRequest"], indent=2))
+                                print("-----------------------------")
+                    break
+                elif session_state == "FAILED":
+                    print("Session failed.")
+                    break
+                
+                time.sleep(10) # Wait for 10 seconds before checking again
+
         else:
             print(f"\nFailed to start JULES session. Error code: {error_code}")
     else:

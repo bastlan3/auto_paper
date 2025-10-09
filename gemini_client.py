@@ -1,4 +1,5 @@
 import google.generativeai as genai
+from google.genai import types
 import os
 import config
 import wave
@@ -86,24 +87,23 @@ def get_multi_speaker_tts_response(dialogue_script: str):
         response = tts_model.generate_content(
             model="gemini-2.5-flash-preview-tts",
             contents=dialogue_script,
-            generation_config=genai.GenerationConfig(
+            config=types.GenerateContentConfig(
                 response_modalities=["AUDIO"],
-            ),
-            speech_config=genai.SpeechConfig(
-                multi_speaker_voice_config=genai.MultiSpeakerVoiceConfig(
-                    speaker_voice_configs=[
-                        genai.SpeakerVoiceConfig(
-                            speaker='Interviewer',
-                            voice_config=genai.VoiceConfig(
-                                prebuilt_voice_config=genai.PrebuiltVoiceConfig(
+                speech_config=types.SpeechConfig(
+                    multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
+                        speaker_voice_configs=[
+                        types.SpeakerVoiceConfig(
+                            speaker='Joe',
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
                                     voice_name='Kore',
                                 )
                             )
                         ),
-                        genai.SpeakerVoiceConfig(
-                            speaker='Author',
-                            voice_config=genai.VoiceConfig(
-                                prebuilt_voice_config=genai.PrebuiltVoiceConfig(
+                        types.SpeakerVoiceConfig(
+                            speaker='Jane',
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
                                     voice_name='Puck',
                                 )
                             )
@@ -111,6 +111,7 @@ def get_multi_speaker_tts_response(dialogue_script: str):
                     ]
                 )
             )
+   )
         )
         return response.candidates[0].content.parts[0].inline_data.data
     except Exception as e:
