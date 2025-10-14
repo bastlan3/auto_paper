@@ -151,7 +151,7 @@ def get_paper_details(paper_id: str):
 @app.post("/api/papers/{paper_id}/implementation-plan")
 def get_implementation_plan(paper_id: str):
     """Generates a technical implementation plan for a given paper."""
-    prompt = METHOD_PROMPT_TEMPLATE.format(abstract=arxiv_client.fetch_paper_text(paper_id))
+    prompt = METHOD_PROMPT_TEMPLATE.format(paper_text=arxiv_client.fetch_paper_text(paper_id))
     plan = gemini_client.get_gemini_response(prompt)
     if not plan:
         raise HTTPException(status_code=500, detail="Failed to generate implementation plan.")
