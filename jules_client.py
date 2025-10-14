@@ -4,6 +4,7 @@ import config
 from urllib.parse import urlparse
 import logging
 import time
+import os
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,6 +53,20 @@ def approve_jules_plan(session_id):
     response.raise_for_status()
     return response.json()
 
+def approve_jules_pull_request(session_name):
+    """
+    Approves the pull request through the JULES API.
+    This tells JULES to create and push the PR to GitHub.
+    """
+    url = f"{config.JULES_API_BASE_URL}/{session_name}:approvePullRequest"
+    headers = {
+        "X-Goog-Api-Key": config.JULES_API_KEY,
+        "Content-Type": "application/json"
+    }
+    response = requests.post(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
 def send_jules_message(session_id, prompt):
     url = f"{config.JULES_API_BASE_URL}/sessions/{session_id}:sendMessage"
     headers = {
@@ -63,7 +78,7 @@ def send_jules_message(session_id, prompt):
     response.raise_for_status()
     return response.json()
 
-def start_jules_build(repo_url: str, implementation_plan: str, title: str):
+def start_jules_build(repo_url: str, implementation_plan: str, title: str, starting_branch: str = "main"):
     """
     Creates a new session in the JULES API to start a code generation task.
     Returns a tuple of (session_data, error_code).
@@ -86,11 +101,27 @@ def start_jules_build(repo_url: str, implementation_plan: str, title: str):
     }
     source_name = f"sources/github/{owner}/{repo}"
 
+    try:
+        logging.info("Checking for available JULES sources...")
+        sources_response = list_jules_sources()
+        available_sources = [s.get('name') for s in sources_response.get('sources', [])]
+        
+        if source_name not in available_sources:
+            logging.error(f"Source '{source_name}' not found in JULES.")
+            logging.error("Please ensure the JULES GitHub App is installed on the repository and has access.")
+            logging.info(f"Available sources: {available_sources}")
+            return None, 404 # Not Found
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to list JULES sources: {e}")
+        if e.response is not None:
+            return None, e.response.status_code
+        return None, -1
+
     payload = {
         "prompt": implementation_plan,
         "sourceContext": {
             "source": source_name,
-            "githubRepoContext": {"startingBranch": "main"}
+            "githubRepoContext": {"startingBranch": starting_branch}
         },
         "title": title
     }
@@ -111,6 +142,26 @@ def start_jules_build(repo_url: str, implementation_plan: str, title: str):
             return None, status_code
         return None, -1
 
+def merge_github_pull_request(pr_url, github_token):
+    """
+    Merges a GitHub pull request using the GitHub API.
+    """
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    # Extract owner, repo, and pull_number from PR URL
+    try:
+        path_parts = urlparse(pr_url).path.strip('/').split('/')
+        owner, repo, _, pull_number = path_parts[0], path_parts[1], path_parts[2], path_parts[3]
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pull_number}/merge"
+        response = requests.put(api_url, headers=headers, json={"merge_method": "merge"})
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logging.error(f"Failed to merge PR: {e}")
+        return None
+
 if __name__ == '__main__':
     print("--- Running manual test of JULES API ---")
 
@@ -121,7 +172,8 @@ if __name__ == '__main__':
         test_title = f"Test run for {test_repo_name}"
 
         print(f"Attempting to start JULES session for repo: {test_repo_url}")
-        session_info, error_code = start_jules_build(test_repo_url, test_plan, test_title)
+        # You might need to change "main" to "master" if that's your default branch.
+        session_info, error_code = start_jules_build(test_repo_url, test_plan, test_title, starting_branch="main")
 
         if session_info and session_info.get("name"):
             session_name = session_info["name"]
@@ -131,22 +183,87 @@ if __name__ == '__main__':
 
             while True:
                 print("Checking session status...")
-                session_details = get_jules_session(session_name)
-                session_state = session_details.get("state")
-                print(f"Current session state: {session_state}")
+                try:
+                    session_details = get_jules_session(session_name)
+                    session_state = session_details.get("state")
+                    print(f"Current session state: {session_state}")
+                except requests.exceptions.ConnectionError as e:
+                    logging.error(f"Network error while checking session status: {e}")
+                    print("\nNetwork connection lost. Retrying in 15 seconds...")
+                    time.sleep(15)
+                    continue
+                except requests.exceptions.RequestException as e:
+                    logging.error(f"Error checking session status: {e}")
+                    print("\nError occurred while checking status. Retrying in 15 seconds...")
+                    time.sleep(15)
+                    continue
 
                 if session_state == "COMPLETED":
                     print("Session completed successfully!")
+                    
+                    # Check if PR already exists
+                    pr_exists = False
                     if session_details.get("outputs"):
                         for output in session_details["outputs"]:
                             if output.get("pullRequest"):
+                                pr_exists = True
                                 print("\n--- Pull Request Information ---")
                                 print(json.dumps(output["pullRequest"], indent=2))
                                 print("-----------------------------")
+                                pr_url = output["pullRequest"].get("url")
+                                print(f"\nPull request is available at: {pr_url}")
+                                print("Please review and merge it manually on GitHub.")
+                                break
+                    
+                    # If no PR exists, check the session state details
+                    if not pr_exists:
+                        print("\n--- Session Details ---")
+                        print(json.dumps(session_details, indent=2))
+                        print("----------------------")
+                        print("\nNo pull request found in outputs.")
+                        print("This may mean:")
+                        print("1. The session completed but JULES couldn't create a PR (check permissions)")
+                        print("2. You need to manually approve the PR in the JULES UI")
+                        print("3. The code changes were too small or there were no changes to commit")
+                        print("\nPlease check the JULES UI to see the session status and approve the PR if needed.")
+                    break
+                elif session_state == "AWAITING_PLAN_APPROVAL":
+                    print("\nSession is waiting for plan approval.")
+                    print("The implementation plan needs to be reviewed before JULES can proceed.")
+                    user_input = input("Would you like to approve the plan now? (yes/no): ").strip().lower()
+                    if user_input == "yes":
+                        try:
+                            print("Approving plan...")
+                            session_id = session_name.split('/')[-1]
+                            approve_jules_plan(session_id)
+                            print("Plan approved! JULES will now start implementing the changes.")
+                        except Exception as e:
+                            logging.error(f"Failed to approve plan: {e}")
+                            if hasattr(e, 'response') and e.response is not None:
+                                logging.error(f"Response: {e.response.text}")
+                            print("Failed to approve plan automatically. Please approve it manually in the JULES UI.")
+                    else:
+                        print("Plan approval skipped. Please approve manually in the JULES UI.")
+                        break
+                elif session_state == "AWAITING_USER_INPUT":
+                    print("\nSession is waiting for user input.")
+                    print("JULES may need clarification or approval before proceeding.")
+                    print("Please check the JULES UI for details.")
                     break
                 elif session_state == "FAILED":
                     print("Session failed.")
+                    print("\n--- Session Failure Details ---")
+                    print(json.dumps(session_details, indent=2))
+                    print("-------------------------------")
+                    print("\n--- Troubleshooting ---")
+                    print(f"The session failed quickly, which often indicates a setup issue.")
+                    print(f"1. Verify that the starting branch ('{session_details.get('sourceContext', {}).get('githubRepoContext', {}).get('startingBranch')}') exists in the repository '{test_repo_url}'. It might be 'master' instead of 'main'.")
+                    print("2. Ensure the repository is not empty and has at least one commit on the starting branch.")
+                    print("3. Check that the JULES GitHub App is installed and has permissions for this repository.")
+                    print("-----------------------")
                     break
+                else:
+                    print("Session is still working...")
                 
                 time.sleep(10) # Wait for 10 seconds before checking again
 

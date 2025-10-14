@@ -7,7 +7,6 @@ import gemini_client
 import github_client
 import jules_client
 import logging
-import re
 from typing import List, Optional
 import io
 import os
@@ -51,7 +50,7 @@ RULES:
 
 User Question: {question}"""
 
-DIALOGUE_PROMPT_TEMPLATE = """You are a scriptwriter for a science podcast. Your task is to create a 10-minute conversational script between an "Interviewer" and the "Author" of a research paper.
+DIALOGUE_PROMPT_TEMPLATE = """You are a scriptwriter for a science podcast. Your task is to create a 5-minute conversational script between an "Interviewer" and the "Author" of a research paper.
 
 The script should be engaging and informative for a general audience with a keen interest in science.
 
@@ -67,7 +66,7 @@ The script should be engaging and informative for a general audience with a keen
 - Explains complex concepts in an easy-to-understand manner.
 
 **Script Guidelines:**
-- The total length should be approximately 10 minutes of spoken dialogue.
+- The total length should be approximately 5 minutes of spoken dialogue.
 - The dialogue must be formatted exactly as follows, with "Interviewer:" and "Author:" on new lines.
 - The script must start with "TTS the following conversation between Interviewer and Author:"
 - Ground all of the Author's responses in the provided paper text.
@@ -84,7 +83,7 @@ Author: Thank you for having me. The central problem we address is catastrophic 
 Interviewer: That sounds complex. How does your proposed method, Synaptic Metaplasticity Assimilation, tackle this?
 Author: Our method works by...
 
-Now, generate the full 10-minute script based on the paper text provided.
+Now, generate the full 5-minute script based on the paper text provided.
 """
 
 # --- Pydantic Models ---
@@ -162,46 +161,26 @@ def get_implementation_plan(paper_id: str):
 def build_code(paper_id: str, request: BuildCodeRequest):
     """Creates a GitHub repo, waits, and then triggers the JULES build process."""
     paper = get_paper_details(paper_id)
-    repo_url = github_client.create_github_repo(request.repo_name, f"Code for {paper['title']}")
+    # Check if repo already exists and modify name if needed
+    original_repo_name = request.repo_name
+    repo_name_to_use = original_repo_name
+    
+    if github_client.repo_exists(original_repo_name):
+        repo_name_to_use = f"{original_repo_name}--jules_coded"
+    
+    repo_url = github_client.create_github_repo(repo_name_to_use, f"Code for {paper['title']}")
     if not repo_url:
         raise HTTPException(status_code=500, detail="Failed to create GitHub repository.")
 
     # Add a delay to allow for GitHub API replication before JULES accesses it
-    logging.info("Waiting 5 seconds for GitHub repository to be available...")
-    time.sleep(5)
+    logging.info("Waiting 20 seconds for GitHub repository to be available...")
+    time.sleep(20)
 
     session_data, error_code = jules_client.start_jules_build(
         repo_url=repo_url,
         implementation_plan=request.implementation_plan,
         title=f"AI-Gen for: {paper['title']}"
     )
-    if jules_client.session_info and jules_client.session_info.get("name"):
-            session_name = jules_client.session_info["name"]
-            print(f"\n--- JULES Session Info ---")
-            print(json.dumps(jules_client.session_info, indent=2))
-            print("--------------------------")
-
-            while True:
-                print("Checking session status...")
-                session_details = jules_client.get_jules_session(session_name)
-                session_state = session_details.get("state")
-                print(f"Current session state: {session_state}")
-
-                if session_state == "COMPLETED":
-                    print("Session completed successfully!")
-                    if session_details.get("outputs"):
-                        for output in session_details["outputs"]:
-                            if output.get("pullRequest"):
-                                print("\n--- Pull Request Information ---")
-                                print(json.dumps(output["pullRequest"], indent=2))
-                                print("-----------------------------")
-                    break
-                elif session_state == "FAILED":
-                    print("Session failed.")
-                    break
-                time.sleep(60) # Wait for 60 seconds before checking again
-    else:
-        print(f"\nFailed to start JULES session. Error code: {error_code}")
 
     if not session_data:
         if error_code == 404:
@@ -214,6 +193,34 @@ def build_code(paper_id: str, request: BuildCodeRequest):
             raise HTTPException(status_code=404, detail=error_detail)
 
         raise HTTPException(status_code=500, detail=f"Failed to start JULES build session. Error code: {error_code}")
+
+    if session_data and session_data.get("name"):
+        session_name = session_data["name"]
+        print(f"\n--- JULES Session Info ---")
+        print(json.dumps(session_data, indent=2))
+        print("--------------------------")
+
+        while True:
+            print("Checking session status...")
+            session_details = jules_client.get_jules_session(session_name)
+            session_state = session_details.get("state")
+            print(f"Current session state: {session_state}")
+
+            if session_state == "COMPLETED":
+                print("Session completed successfully!")
+                if session_details.get("outputs"):
+                    for output in session_details["outputs"]:
+                        if output.get("pullRequest"):
+                            print("\n--- Pull Request Information ---")
+                            print(json.dumps(output["pullRequest"], indent=2))
+                            print("-----------------------------")
+                break
+            elif session_state == "FAILED":
+                print("Session failed.")
+                break
+            time.sleep(60) # Wait for 60 seconds before checking again
+    else:
+        print(f"\nFailed to start JULES session. Error code: {error_code}")
 
     return {"repo_url": repo_url, "jules_session": session_data}
 
@@ -236,50 +243,8 @@ def chat_with_paper(paper_id: str, request: ChatRequest):
 
     return {"answer": answer}
 
-@app.post("/api/papers/{paper_id}/vocal-summary")
-async def get_vocal_summary(paper_id: str):
-    """Generates a vocal summary of a paper's abstract."""
-    logging.info(f"Endpoint /api/papers/{paper_id}/vocal-summary called.")
-    paper = get_paper_details(paper_id)
-    summary = paper.get("summary")
-    if not summary:
-        raise HTTPException(status_code=404, detail="Summary not found for this paper.")
 
-    audio_data = gemini_client.get_gemini_tts_response(summary)
-    if not audio_data:
-        raise HTTPException(status_code=500, detail="Failed to generate vocal summary.")
-
-    return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
-
-@app.post("/api/tts")
-async def text_to_speech(request: TTSRequest):
-    """Generates audio from text using the Gemini TTS model."""
-    logging.info(f"Endpoint /api/tts called with voice: {request.voice}")
-    audio_data = gemini_client.get_gemini_tts_response(request.text, request.voice)
-    if not audio_data:
-        raise HTTPException(status_code=500, detail="Failed to generate audio.")
-
-    return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
-
-# --- Helper for saving audio ---
-def save_wave_file(filename: str, pcm_data: bytes, channels: int = 1, rate: int = 24000, sample_width: int = 2):
-    """Saves PCM data to a WAV file."""
-    with wave.open(filename, "wb") as wf:
-        wf.setnchannels(channels)
-        wf.setsampwidth(sample_width)
-        wf.setframerate(rate)
-        wf.writeframes(pcm_data)
-
-def cleanup_file(path: str):
-    """Removes a file and logs the action."""
-    try:
-        os.remove(path)
-        logging.info(f"Successfully cleaned up temporary file: {path}")
-    except OSError as e:
-        logging.error(f"Error cleaning up file {path}: {e}")
-
-@app.post("/api/papers/{paper_id}/detailed-summary")
-async def get_detailed_summary(paper_id: str, background_tasks: BackgroundTasks):
+def get_detailed_summary(paper_id: str, background_tasks: BackgroundTasks):
     """
     Generates a detailed, 10-minute conversational audio summary of a paper.
     """
@@ -317,6 +282,53 @@ async def get_detailed_summary(paper_id: str, background_tasks: BackgroundTasks)
         media_type="audio/wav",
         filename=f"detailed_summary_{paper_id}.wav"
     )
+
+
+@app.post("/api/papers/{paper_id}/vocal-summary")
+async def get_vocal_summary(paper_id: str):
+    """Generates a vocal summary of a paper's abstract."""
+    logging.info(f"Endpoint /api/papers/{paper_id}/vocal-summary called.")
+    response = get_detailed_summary(paper_id, BackgroundTasks())
+    """    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found for this paper.")
+    audio_data = gemini_client.get_multi_speaker_tts_response(summary)
+    if audio_data:
+        with wave.open('test_output.wav', 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(24000)
+            wav.writeframes(audio_data)
+    if not audio_data:
+        raise HTTPException(status_code=500, detail="Failed to generate vocal summary.")
+    """
+    return response #StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
+
+@app.post("/api/tts")
+async def text_to_speech(request: TTSRequest):
+    """Generates audio from text using the Gemini TTS model."""
+    logging.info(f"Endpoint /api/tts called with voice: {request.voice}")
+    audio_data = gemini_client.get_gemini_tts_response(request.text, request.voice)
+    if not audio_data:
+        raise HTTPException(status_code=500, detail="Failed to generate audio.")
+
+    return StreamingResponse(io.BytesIO(audio_data), media_type="audio/wav")
+
+# --- Helper for saving audio ---
+def save_wave_file(filename: str, pcm_data: bytes, channels: int = 1, rate: int = 24000, sample_width: int = 2):
+    """Saves PCM data to a WAV file."""
+    with wave.open(filename, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(rate)
+        wf.writeframes(pcm_data)
+
+def cleanup_file(path: str):
+    """Removes a file and logs the action."""
+    try:
+        os.remove(path)
+        logging.info(f"Successfully cleaned up temporary file: {path}")
+    except OSError as e:
+        logging.error(f"Error cleaning up file {path}: {e}")
 
 if __name__ == "__main__":
     import uvicorn
