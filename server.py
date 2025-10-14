@@ -38,7 +38,8 @@ paper_cache: List[dict] = []
 
 # --- System Prompts ---
 SUMMARY_PROMPT_TEMPLATE = """You are an expert scientific communicator... Output ONLY the three-sentence summary. Abstract: `{abstract}`"""
-METHOD_PROMPT_TEMPLATE = """You are a senior research engineer... Format as a Markdown-ready guide. CONTEXT: `{abstract}`"""
+METHOD_PROMPT_TEMPLATE = """You are a senior research engineer... Format as a Markdown-ready guide to build the code, make sure to give all the necessary informations.
+                        Be sure that your intern understands that you want him to build the code and do not have to ask any specific question extra. CONTEXT: `{paper_text}`"""
 QA_PROMPT_TEMPLATE = """You are a specialized AI assistant with the full text of a research paper. Your task is to answer user questions based on the paper's content.
 CONTEXT:
 {paper_text}
@@ -150,8 +151,7 @@ def get_paper_details(paper_id: str):
 @app.post("/api/papers/{paper_id}/implementation-plan")
 def get_implementation_plan(paper_id: str):
     """Generates a technical implementation plan for a given paper."""
-    paper = get_paper_details(paper_id)
-    prompt = METHOD_PROMPT_TEMPLATE.format(abstract=paper['abstract'])
+    prompt = METHOD_PROMPT_TEMPLATE.format(abstract=arxiv_client.fetch_paper_text(paper_id))
     plan = gemini_client.get_gemini_response(prompt)
     if not plan:
         raise HTTPException(status_code=500, detail="Failed to generate implementation plan.")
@@ -199,8 +199,10 @@ def build_code(paper_id: str, request: BuildCodeRequest):
         print(f"\n--- JULES Session Info ---")
         print(json.dumps(session_data, indent=2))
         print("--------------------------")
+        session_id = session_name.split('/')[-1] if session_name else ""
+        jules_ui_url = f"https://jules.ai/session/{session_id}" if session_id else None
 
-        while True:
+        """while True:
             print("Checking session status...")
             session_details = jules_client.get_jules_session(session_name)
             session_state = session_details.get("state")
@@ -218,11 +220,16 @@ def build_code(paper_id: str, request: BuildCodeRequest):
             elif session_state == "FAILED":
                 print("Session failed.")
                 break
-            time.sleep(60) # Wait for 60 seconds before checking again
+            time.sleep(60) # Wait for 60 seconds before checking again"""
     else:
         print(f"\nFailed to start JULES session. Error code: {error_code}")
 
-    return {"repo_url": repo_url, "jules_session": session_data}
+    return {
+        "repo_url": repo_url,
+        "jules_session": session_data,
+        "jules_ui_url": jules_ui_url,
+        "message": "JULES is working on your code. Follow progress and review code in the JULES UI."
+    }
 
 @app.post("/api/papers/{paper_id}/chat")
 def chat_with_paper(paper_id: str, request: ChatRequest):

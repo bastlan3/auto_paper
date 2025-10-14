@@ -7,6 +7,7 @@ type BuildStep = 'idle' | 'generatingPlan' | 'planReady' | 'building' | 'buildCo
 const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-green-500"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>;
 const LoadingSpinner = () => <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent"></div>;
 
+
 interface BuildCodeTabProps {
   paperId: string;
   paperTitle: string;
@@ -19,6 +20,10 @@ const BuildCodeTab: React.FC<BuildCodeTabProps> = ({ paperId, paperTitle }) => {
     const [buildStatus, setBuildStatus] = useState({ repo: '', jules: '' });
     const [repoUrl, setRepoUrl] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<React.ReactNode>(null);
+    const [errorMessage, setErrorMessage] = useState<React.ReactNode>(null);
+
+
 
     useEffect(() => {
         // Sanitize paper title to create a default repo name
@@ -49,25 +54,45 @@ const BuildCodeTab: React.FC<BuildCodeTabProps> = ({ paperId, paperTitle }) => {
         setBuildStatus({ repo: 'inProgress', jules: '' });
 
         try {
-            const res = await fetch(`/api/papers/${paperId}/build-code`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ repo_name: repoName, implementation_plan: implementationPlan }),
-            });
-            if (!res.ok) {
-                throw new Error('Failed to create repository and start build.');
+        const response = await fetch(`http://localhost:8000/api/papers/${paperId}/build-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                repo_name: repoName,
+                implementation_plan: implementationPlan
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to build code');
             }
-            const data = await res.json();
-            setRepoUrl(data.repo_url);
-            setBuildStatus({ repo: 'done', jules: 'done' });
-            setStep('buildComplete');
 
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-            setStep('error');
-        }
-    };
-
+        const data = await response.json();
+            
+        // Show success message with JULES link
+        if (data.jules_ui_url) {
+            // Display a success message with the link
+            setSuccessMessage(
+                <div>
+                <p>{data.message}</p>
+                <a 
+                    href={data.jules_ui_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline"
+                >
+                    Follow progress and review code here
+                </a>
+                <p className="mt-2">Repository: <a href={data.repo_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{data.repo_url}</a></p>
+                </div>
+            );
+            }
+            
+        } catch (error) {
+            console.error('Error building code:', error);
+            setErrorMessage('Failed to start JULES build');
+            }
+        };
     return (
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
             {step === 'idle' && (
