@@ -14,6 +14,7 @@ import uuid
 import wave
 import time
 import json
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +36,18 @@ app.add_middleware(
 
 # --- In-memory Cache ---
 paper_cache: List[dict] = []
+
+# --- Scheduler for daily cache clearing ---
+def clear_paper_cache():
+    """Clears the in-memory paper cache."""
+    global paper_cache
+    logging.info("Clearing paper cache as per schedule.")
+    paper_cache = []
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(clear_paper_cache, 'cron', hour=8)
+scheduler.start()
+
 
 # --- System Prompts ---
 SUMMARY_PROMPT_TEMPLATE = """You are an expert scientific communicator... Output ONLY the three-sentence summary. Abstract: `{abstract}`"""

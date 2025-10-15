@@ -1,0 +1,17 @@
+appId: com.example.myapp
+productName: My App
+directories:
+  output: dist
+files:
+  - out/**/*
+  - main.js
+  - package.json
+extraFiles:
+  - from: dist/server
+    to: resources/app/dist/server
+mac:
+  target: dmg
+win:
+  target: nsis
+linux:
+  target: AppImage

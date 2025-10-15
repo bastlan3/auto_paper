@@ -3,10 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"npm:start:backend:dev\" \"wait-on http://localhost:8000 && npm:start:frontend\"",
+    "start:frontend": "next dev",
+    "start:backend": "cd .. && uvicorn server:app",
+    "start:backend:dev": "cd .. && uvicorn server:app --reload",
     "build": "next build",
+    "build:backend": "node build-backend.js",
+    "export": "next export",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron": "electron .",
+    "dist": "npm run build:backend && npm run build && npm run export && electron-builder",
+    "postinstall": "pip install -r ../requirements.txt"
   },
   "dependencies": {
     "next": "^14.2.33",
@@ -18,10 +26,14 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^8.2.2",
+    "electron": "^38.2.2",
+    "electron-builder": "^24.13.3",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^7.2.0"
   }
 }

@@ -16,7 +16,7 @@ async function getPapers(): Promise<Paper[]> {
   try {
     // This fetch call will be proxied to http://localhost:8000/api/papers
     // by the Next.js development server.
-    const res = await fetch('http://localhost:3000/api/papers', {
+    const res = await fetch('http://localhost:8000/api/papers', {
       cache: 'no-store', // Ensure fresh data on every request
     });
 

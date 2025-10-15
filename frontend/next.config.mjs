@@ -1,16 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    async rewrites() {
-        return [
-            {
-                source: '/api/:path*',
-                destination: 'http://localhost:8000/api/:path*', // Proxy to Backend
-            },
-        ];
-    },
-     experimental: {
-    proxyTimeout: 600000, // 10 minutes in milliseconds
-  },
+  output: 'export',
+  distDir: 'out',
+
+  // Optional: Add a trailing slash to all paths `/about` -> `/about/`
+  // trailingSlash: true,
+
+  // Optional: Change the output directory `out` -> `dist`
+  // distDir: 'dist',
 };
 
 export default nextConfig;
