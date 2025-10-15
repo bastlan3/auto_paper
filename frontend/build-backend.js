@@ -3,7 +3,8 @@ const path = require('path');
 
 const pyInstallerCommand = `pyinstaller --name server --onefile --distpath ${path.join(
   __dirname,
-  'dist'
+  'dist',
+  'server'
 )} ${path.join(__dirname, '..', 'server.py')}`;
 
 exec(pyInstallerCommand, (err, stdout, stderr) => {

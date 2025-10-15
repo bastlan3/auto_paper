@@ -5,6 +5,7 @@ directories:
 files:
   - out/**/*
   - main.js
+  - preload.js
   - package.json
 extraFiles:
   - from: dist/server

@@ -48,7 +48,6 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(clear_paper_cache, 'cron', hour=8)
 scheduler.start()
 
-
 # --- System Prompts ---
 SUMMARY_PROMPT_TEMPLATE = """You are an expert scientific communicator... Output ONLY the three-sentence summary. Abstract: `{abstract}`"""
 METHOD_PROMPT_TEMPLATE = """You are a senior research engineer... Format as a Markdown-ready guide to build the code, make sure to give all the necessary informations.
@@ -133,7 +132,7 @@ def process_papers_with_summaries(papers: List[dict]) -> List[dict]:
     return papers
 
 # --- API Endpoints ---
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Server is running"}
 
