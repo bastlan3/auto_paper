@@ -133,6 +133,10 @@ def process_papers_with_summaries(papers: List[dict]) -> List[dict]:
     return papers
 
 # --- API Endpoints ---
+@app.get("/")
+def read_root():
+    return {"message": "Server is running"}
+
 @app.get("/api/papers", response_model=List[Paper])
 def get_papers():
     """Fetches the latest papers from arXiv and generates summaries."""

@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import PaperCard from "@/components/PaperCard";
+import Link from "next/link";
 
 interface Paper {
   id: string;
@@ -13,9 +14,8 @@ interface Paper {
 
 async function getPapers(): Promise<Paper[]> {
   try {
-    // This fetch call will be proxied to http://localhost:8000/api/papers
-    // by the Next.js development server.
-    const res = await fetch('http://localhost:8000/api/papers', {
+    // This fetch call will be proxied to the backend server.
+    const res = await fetch('/api/papers', {
       cache: 'no-store', // Ensure fresh data on every request
     });
 
@@ -51,9 +51,9 @@ export default async function Home() {
         {papers.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {papers.map((paper) => (
-              <a href={`/paper/${paper.id}`} key={paper.id}>
+              <Link href={`/paper/${paper.id}`} key={paper.id}>
                 <PaperCard paper={paper} />
-              </a>
+              </Link>
             ))}
           </div>
         ) : (
