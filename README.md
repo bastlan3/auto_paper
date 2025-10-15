@@ -127,25 +127,38 @@ If you **have** configured the keys, running the scripts will execute a live tes
 
 ## Running the Full-Stack Application
 
-To run the application, you need to start both the backend server and the frontend development server in two separate terminals.
+There are two ways to run the application: in development mode with hot-reloading, or as a packaged desktop application.
 
-**Terminal 1: Start the Backend API Server**
+### Development Mode
 
-Navigate to the project's root directory and run the FastAPI server:
+To run the application in development mode, you need to start the backend and frontend servers.
 
-```bash
-python server.py
-```
-
-You should see output indicating the server has started, usually at `http://localhost:8000`.
-
-**Terminal 2: Start the Frontend Development Server**
-
-Navigate to the `frontend` directory and run the Next.js development server:
+Navigate to the `frontend` directory and run the `dev` script:
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-The frontend will now be available at `http://localhost:3000`. Open this URL in your browser to use the application. API requests from the frontend will be automatically proxied to your backend server.
+This will start both the backend and frontend development servers concurrently. The frontend will be available at `http://localhost:3000`.
+
+### Desktop Application
+
+The application can be packaged into a standalone desktop application.
+
+**Build the Application**
+
+To build the application, navigate to the `frontend` directory and run the `dist` script:
+
+```bash
+cd frontend
+npm install
+npm run dist
+```
+
+This will create a distributable file in the `frontend/dist` directory.
+
+**Run the Application**
+
+Once the application is built, you can run it by double-clicking the executable file in the `frontend/dist` directory.

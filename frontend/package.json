@@ -14,6 +14,7 @@
     "lint": "next lint",
     "electron": "electron .",
     "dist": "npm run build:backend && npm run build && npm run export && electron-builder",
+    "audit": "npm audit",
     "postinstall": "pip install -r ../requirements.txt"
   },
   "dependencies": {

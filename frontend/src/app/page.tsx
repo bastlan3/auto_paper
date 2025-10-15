@@ -1,6 +1,5 @@
 import Header from "@/components/Header";
 import PaperCard from "@/components/PaperCard";
-import Link from "next/link";
 
 interface Paper {
   id: string;
@@ -52,9 +51,9 @@ export default async function Home() {
         {papers.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {papers.map((paper) => (
-              <Link href={`/paper/${paper.id}`} key={paper.id}>
+              <a href={`/paper/${paper.id}`} key={paper.id}>
                 <PaperCard paper={paper} />
-              </Link>
+              </a>
             ))}
           </div>
         ) : (

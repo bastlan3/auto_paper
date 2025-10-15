@@ -8,7 +8,7 @@ files:
   - package.json
 extraFiles:
   - from: dist/server
-    to: resources/app/dist/server
+    to: resources/dist/server
 mac:
   target: dmg
 win:
